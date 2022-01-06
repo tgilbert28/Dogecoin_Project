@@ -1,0 +1,143 @@
+---
+title: "365_project_update"
+author: "Tyler Gilbert"
+date: "11/10/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("TSA")
+library("leaps")
+library("locfit")
+library("MASS")
+library("mgcv")
+library("tseries")
+library("uroot")
+library(zoo)
+library(tsbox)
+library(xts)
+
+doge = read.csv("DOGE-USD.csv", header = TRUE)
+attach(doge)
+
+head(doge)
+
+
+doge2 = subset(doge, Date > 2022-01-01, select = c(Date, High))
+doge2$Date = as.Date(doge2$Date, format = "%Y-%m-%d")
+
+doge_ts = xts(doge2$High, doge2$Date)
+doge_ts = na.omit(doge_ts)
+
+
+doge_ts2 = na.omit(diff(log(doge_ts)))
+
+acf(doge_ts2,lag.max=20, xaxt="n", ci.type = 'ma', main="ACF for First Diff of Log ( doge )")
+axis(1, at=0:20/12, labels=0:20)
+pacf(doge_ts2,xlim=c(1,25), main = "Sample PACF")
+eacf(doge_ts2, ar = 7, ma =7) 
+best.arma=armasubsets(y=doge_ts2, nar=10, nma=10, y.name='test', ar.method='ols')
+plot(best.arma)
+
+ML.estimate.1 = arima(doge_ts2,order=c(0,0,1),method='ML') 
+ML.estimate.1
+
+ML.estimate.2 = arima(doge_ts2,order=c(2,0,0),method='ML') 
+ML.estimate.2
+
+ML.estimate.3 = arima(doge_ts2,order=c(1,0,1),method='ML') 
+ML.estimate.3
+
+ML.estimate.4 = arima(doge_ts2,order=c(1,0,2),method='ML') 
+ML.estimate.4
+
+ML.estimate.5 = arima(doge_ts2,order=c(0,0,9),method='ML') 
+ML.estimate.5
+
+plot(rstandard(ML.estimate.1),ylab='Standardized Residuals',type='o', main = " MA 1")
+abline(h=0)
+
+
+plot(rstandard(ML.estimate.2),ylab='Standardized Residuals',type='o', main = " AR 2")
+abline(h=0)
+
+plot(rstandard(ML.estimate.3),ylab='Standardized Residuals',type='o', main = " ARIMA (1,1,1)")
+abline(h=0)
+
+
+plot(rstandard(ML.estimate.4),ylab='Standardized Residuals',type='o', main = " ARIMA(1,0,2")
+abline(h=0)
+
+
+hist(rstandard(ML.estimate.1),xlab='Standardized Residuals')
+hist(rstandard(ML.estimate.2),xlab='Standardized Residuals')
+hist(rstandard(ML.estimate.3),xlab='Standardized Residuals', main = "ARIMA(1,1,1)")
+hist(rstandard(ML.estimate.4),xlab='Standardized Residuals')
+
+qqnorm(residuals(ML.estimate.1))
+qqline(residuals(ML.estimate.1))
+
+
+qqnorm(residuals(ML.estimate.2))
+qqline(residuals(ML.estimate.2))
+
+qqnorm(residuals(ML.estimate.3), main = "ARIMA(1,1,1)")
+qqline(residuals(ML.estimate.3))
+
+
+qqnorm(residuals(ML.estimate.4))
+qqline(residuals(ML.estimate.4))
+
+runs(rstandard(ML.estimate.1))
+runs(rstandard(ML.estimate.2))
+runs(rstandard(ML.estimate.3))
+runs(rstandard(ML.estimate.4))
+runs(rstandard(ML.estimate.5))
+shapiro.test(rstandard(ML.estimate.1))
+shapiro.test(rstandard(ML.estimate.2))
+shapiro.test(rstandard(ML.estimate.3))
+shapiro.test(rstandard(ML.estimate.4))
+shapiro.test(rstandard(ML.estimate.5))
+
+tsdiag(ML.estimate.1, gof=15, omit.initial=F)
+tsdiag(ML.estimate.2, gof=15, omit.initial=F)
+tsdiag(ML.estimate.3, gof=15, omit.initial=F)
+tsdiag(ML.estimate.4, gof=15, omit.initial=F)
+
+
+
+```
+
+Possible MA(1) model (acf)
+Possible AR(1) or AR(2) model (pacf)
+Possible MA(1), ARMA(1,1), ARMA(1,2) (eacf)
+Possible MA(4), MA(5), ARMA(4,5) (best subsets)
+
+ML estimates:
+MA(1): Yt = 0.11et-1 + et
+AR(2): Yt = 0.101Yt-1 - 0.0780Yt-2 + et (second AR term almost 0)
+ARIMA(1,0,1) = -0.4577Yt-1 + 0.5715et-1 + et
+ARIMA(1,0,2) = all coefficients are 0
+
+None of the models have a normal distribution, so revision needs to be done
+The data might be randomly distributed
+
+
+#------------------------
+#Forecasting
+#------------------------
+
+```{r}
+doge_model = arima(as.ts(doge_ts2),order=c(1,0,1),method='ML')
+
+plot(doge_model,n.ahead=20,xlab='date',ylab='doge price',pch=19, type = "l")
+
+plot(doge_model,n.ahead=20,xlab='date',ylab='doge price',pch=19, type = "l",xlim = c(550,690))
+
+plot(doge_model,n.ahead=20,xlab='date',ylab='doge price',pch=19, type = "l",xlim = c(650,690))
+```
+
